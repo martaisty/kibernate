@@ -8,6 +8,7 @@ import com.synytsia.orm.annotation.Id;
 import com.synytsia.orm.annotation.Table;
 
 import javax.sql.DataSource;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.sql.ResultSet;
@@ -25,12 +26,15 @@ public class SessionImpl implements Session {
     private final DataSource dataSource;
     private final Map<EntityKey, Object> entities = new HashMap<>();
 
+    private boolean isClosed = false;
+
     public SessionImpl(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 
     @Override
     public <T> T findById(Class<T> entityType, Object id) {
+        throwIfClosed();
         verifyEntity(entityType);
         final var entityKey = new EntityKey(entityType, id);
 
@@ -62,8 +66,14 @@ public class SessionImpl implements Session {
         }
     }
 
+    @Override
+    public void close() throws IOException {
+        // TODO dirty checking
+        isClosed = true;
+    }
+
     private void verifyEntity(Class<?> entityType) {
-        if(!entityType.isAnnotationPresent(Entity.class)) {
+        if (!entityType.isAnnotationPresent(Entity.class)) {
             throw new IllegalArgumentException(entityType.getSimpleName() + " is not annotated with @Entity");
         }
     }
@@ -104,5 +114,11 @@ public class SessionImpl implements Session {
         return ofNullable(entityType.getDeclaredAnnotation(Table.class))
                 .map(Table::name)
                 .orElseGet(() -> CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, entityType.getSimpleName()));
+    }
+
+    private void throwIfClosed() {
+        if (isClosed) {
+            throw new IllegalArgumentException("Session is closed");
+        }
     }
 }

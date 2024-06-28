@@ -1,6 +1,8 @@
 package com.synytsia.orm;
 
-public interface Session {
+import java.io.Closeable;
+
+public interface Session extends Closeable {
 
     <T> T findById(Class<T> entityType, Object id);
 }

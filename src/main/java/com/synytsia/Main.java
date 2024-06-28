@@ -5,13 +5,17 @@ import com.synytsia.orm.impl.SessionFactoryImpl;
 import org.postgresql.ds.PGSimpleDataSource;
 
 import javax.sql.DataSource;
+import java.io.IOException;
 
 public class Main {
     public static void main(String[] args) {
         final var sessionFactory = new SessionFactoryImpl(createDataSource());
-        final var session = sessionFactory.openSession();
-        final var user = session.findById(User.class, 3);
-        System.out.println("Found user: " + user);
+        try (final var session = sessionFactory.openSession()) {
+            final var user = session.findById(User.class, 3);
+            System.out.println("Found user: " + user);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static DataSource createDataSource() {
