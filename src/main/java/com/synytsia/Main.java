@@ -1,15 +1,16 @@
 package com.synytsia;
 
 import com.synytsia.demo.entity.User;
-import com.synytsia.orm.Orm;
+import com.synytsia.orm.impl.SessionFactoryImpl;
 import org.postgresql.ds.PGSimpleDataSource;
 
 import javax.sql.DataSource;
 
 public class Main {
     public static void main(String[] args) {
-        final var orm = new Orm(createDataSource());
-        final var user = orm.findById(User.class, 3);
+        final var sessionFactory = new SessionFactoryImpl(createDataSource());
+        final var session = sessionFactory.openSession();
+        final var user = session.findById(User.class, 3);
         System.out.println("Found user: " + user);
     }
 

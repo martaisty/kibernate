@@ -1,6 +1,7 @@
-package com.synytsia.orm;
+package com.synytsia.orm.impl;
 
 import com.google.common.base.CaseFormat;
+import com.synytsia.orm.Session;
 import com.synytsia.orm.annotation.Column;
 import com.synytsia.orm.annotation.Entity;
 import com.synytsia.orm.annotation.Id;
@@ -15,16 +16,17 @@ import java.sql.SQLException;
 import static java.util.Arrays.stream;
 import static java.util.Optional.ofNullable;
 
-public class Orm {
+public class SessionImpl implements Session {
 
     private static final String SELECT_SQL = "SELECT * FROM %s WHERE %s = ?";
 
     private final DataSource dataSource;
 
-    public Orm(DataSource dataSource) {
+    public SessionImpl(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 
+    @Override
     public <T> T findById(Class<T> entityType, Object id) {
         verifyEntity(entityType);
         final var tableName = resolveTableName(entityType);
