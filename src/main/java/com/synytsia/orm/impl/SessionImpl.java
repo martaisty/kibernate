@@ -12,6 +12,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 
 import static java.util.Arrays.stream;
 import static java.util.Optional.ofNullable;
@@ -21,6 +23,7 @@ public class SessionImpl implements Session {
     private static final String SELECT_SQL = "SELECT * FROM %s WHERE %s = ?";
 
     private final DataSource dataSource;
+    private final Map<EntityKey, Object> entities = new HashMap<>();
 
     public SessionImpl(DataSource dataSource) {
         this.dataSource = dataSource;
@@ -29,6 +32,13 @@ public class SessionImpl implements Session {
     @Override
     public <T> T findById(Class<T> entityType, Object id) {
         verifyEntity(entityType);
+        final var entityKey = new EntityKey(entityType, id);
+
+        if (entities.containsKey(entityKey)) {
+            System.out.println("Returning entity from cache");
+            return entityType.cast(entities.get(entityKey));
+        }
+
         final var tableName = resolveTableName(entityType);
         final var idColumn = findIdColumn(entityType);
         final var idColumnName = resolveColumnName(idColumn);
@@ -41,7 +51,9 @@ public class SessionImpl implements Session {
             final var rs = statement.executeQuery();
 
             if (rs.next()) {
-                return createEntityFromResultSet(entityType, rs);
+                final var entity = createEntityFromResultSet(entityType, rs);
+                entities.put(entityKey, entity);
+                return entity;
             }
 
             throw new RuntimeException("Entity not found (id=%s)".formatted(id));
