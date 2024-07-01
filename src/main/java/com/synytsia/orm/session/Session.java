@@ -1,4 +1,4 @@
-package com.synytsia.orm;
+package com.synytsia.orm.session;
 
 import java.io.Closeable;
 

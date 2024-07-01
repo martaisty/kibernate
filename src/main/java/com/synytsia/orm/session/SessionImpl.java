@@ -1,7 +1,6 @@
-package com.synytsia.orm.impl;
+package com.synytsia.orm.session;
 
 import com.google.common.base.CaseFormat;
-import com.synytsia.orm.Session;
 import com.synytsia.orm.annotation.Column;
 import com.synytsia.orm.annotation.Entity;
 import com.synytsia.orm.annotation.Id;

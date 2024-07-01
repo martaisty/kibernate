@@ -1,7 +1,4 @@
-package com.synytsia.orm.impl;
-
-import com.synytsia.orm.Session;
-import com.synytsia.orm.SessionFactory;
+package com.synytsia.orm.session;
 
 import javax.sql.DataSource;
 

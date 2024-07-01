@@ -1,4 +1,4 @@
-package com.synytsia.orm.impl;
+package com.synytsia.orm.session;
 
 public record EntityKey(Class<?> type, Object id) {
 }

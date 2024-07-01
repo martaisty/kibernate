@@ -1,7 +1,7 @@
 package com.synytsia;
 
 import com.synytsia.demo.entity.User;
-import com.synytsia.orm.impl.SessionFactoryImpl;
+import com.synytsia.orm.session.SessionFactoryImpl;
 import org.postgresql.ds.PGSimpleDataSource;
 
 import javax.sql.DataSource;
