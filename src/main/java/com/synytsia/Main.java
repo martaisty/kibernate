@@ -13,6 +13,10 @@ public class Main {
         try (final var session = sessionFactory.openSession()) {
             final var user = session.findById(User.class, 3);
             System.out.println("Found user: " + user);
+
+            user.setName("Bob");
+            user.setAge(25);
+
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

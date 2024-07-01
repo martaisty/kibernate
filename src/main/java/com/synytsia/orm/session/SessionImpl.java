@@ -11,12 +11,16 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.synytsia.orm.utils.EntityUtil.*;
+
 public class SessionImpl implements Session {
 
     private static final String SELECT_BY_COLUMN_SQL = "SELECT * FROM %s WHERE %s = ?";
+    private static final String UPDATE_BY_COLUMN_SQL = "UPDATE %s SET %s WHERE %s = ?";
 
     private final DataSource dataSource;
     private final Map<EntityKey, Object> entities = new HashMap<>();
+    private final Map<EntityKey, Object[]> entitiesInitialSnapshot = new HashMap<>();
 
     private boolean isClosed = false;
 
@@ -35,9 +39,8 @@ public class SessionImpl implements Session {
             return entityType.cast(entities.get(entityKey));
         }
 
-        final var tableName = EntityUtil.resolveTableName(entityType);
-        final var idColumn = EntityUtil.findIdColumn(entityType);
-        final var idColumnName = EntityUtil.resolveColumnName(idColumn);
+        final var tableName = resolveTableName(entityType);
+        final var idColumnName = resolveIdColumnName(entityType);
         final var selectSql = SELECT_BY_COLUMN_SQL.formatted(tableName, idColumnName);
 
         try (final var c = dataSource.getConnection();
@@ -49,6 +52,7 @@ public class SessionImpl implements Session {
             if (rs.next()) {
                 final var entity = createEntityFromResultSet(entityType, rs);
                 entities.put(entityKey, entity);
+                entitiesInitialSnapshot.put(entityKey, toSnapshot(entity));
                 return entity;
             }
 
@@ -60,8 +64,16 @@ public class SessionImpl implements Session {
 
     @Override
     public void close() throws IOException {
-        // TODO dirty checking
-        isClosed = true;
+        if (isClosed) {
+            return;
+        }
+        try {
+            dirtyCheck();
+        } finally {
+            entities.clear();
+            entitiesInitialSnapshot.clear();
+            isClosed = true;
+        }
     }
 
     private <T> T createEntityFromResultSet(Class<T> entityType, ResultSet rs) {
@@ -80,6 +92,38 @@ public class SessionImpl implements Session {
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException |
                  SQLException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private void dirtyCheck() {
+        for (var entityEntry : entities.entrySet()) {
+            final var key = entityEntry.getKey();
+            final var entity = entityEntry.getValue();
+            final var initialSnapshot = entitiesInitialSnapshot.get(key);
+            final var currentSnapshot = toSnapshot(entity);
+
+            if (!areSnapshotsEqual(currentSnapshot, initialSnapshot)) {
+                updateDirtyEntityInDb(key, currentSnapshot);
+            }
+        }
+    }
+
+    private void updateDirtyEntityInDb(final EntityKey entityKey, final Object[] currentSnapshot) {
+        final var tableName = resolveTableName(entityKey.type());
+        final var idColumnName = resolveIdColumnName(entityKey.type());
+        final var updateParams = resolveUpdateParams(entityKey.type());
+        final var updateSql = UPDATE_BY_COLUMN_SQL.formatted(tableName, updateParams, idColumnName);
+
+        try (final var connection = dataSource.getConnection();
+             final var updateStatement = connection.prepareStatement(updateSql)) {
+
+            for (int i = 0; i < currentSnapshot.length; i++) {
+                updateStatement.setObject(i + 1, currentSnapshot[i]);
+            }
+            updateStatement.setObject(currentSnapshot.length + 1, entityKey.id());
+            updateStatement.executeUpdate();
+        } catch (SQLException e) {
+            System.out.printf("Failed to update entity %s (id=%s)%n", entityKey.type().getName(), entityKey.id());
         }
     }
 

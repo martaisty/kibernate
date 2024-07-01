@@ -8,6 +8,10 @@ import com.synytsia.orm.annotation.Id;
 import com.synytsia.orm.annotation.Table;
 
 import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static java.util.Arrays.stream;
 import static java.util.Optional.ofNullable;
@@ -20,6 +24,10 @@ public class EntityUtil {
 
     private EntityUtil() {
 
+    }
+
+    public static String resolveIdColumnName(Class<?> entityType) {
+        return resolveColumnName(findIdColumn(entityType));
     }
 
     public static Field findIdColumn(Class<?> entityType) {
@@ -45,5 +53,53 @@ public class EntityUtil {
         if (!entityType.isAnnotationPresent(Entity.class)) {
             throw new IllegalArgumentException(entityType.getSimpleName() + " is not annotated with @Entity");
         }
+    }
+
+    public static Object[] toSnapshot(Object entity) {
+        return stream(getUpdatableFieldsSortedByName(entity.getClass()))
+                .map(f -> getFieldValueFromEntity(f, entity))
+                .toArray();
+    }
+
+    public static Field[] getUpdatableFieldsSortedByName(final Class<?> entityType) {
+        return Arrays.stream(entityType.getDeclaredFields())
+                .filter(EntityUtil::isFieldUpdatable)
+                .sorted(Comparator.comparing(Field::getName))
+                .toArray(Field[]::new);
+    }
+
+    public static boolean isFieldUpdatable(final Field field) {
+        if (field.isAnnotationPresent(Id.class)) {
+            return false;
+        }
+        // TODO relations between other entities
+        return ofNullable(field.getAnnotation(Column.class))
+                .map(Column::updatable)
+                .orElse(true);
+    }
+
+    public static Object getFieldValueFromEntity(final Field field, final Object entity) {
+        try {
+            field.setAccessible(true);
+            return field.get(entity);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static boolean areSnapshotsEqual(final Object[] current, final Object[] initial) {
+        for (int i = 0; i < current.length; i++) {
+            if (!Objects.equals(current[i], initial[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static String resolveUpdateParams(final Class<?> entityType) {
+        return Arrays.stream(getUpdatableFieldsSortedByName(entityType))
+                .map(EntityUtil::resolveColumnName)
+                .map(columnName -> columnName + " = ?")
+                .collect(Collectors.joining(","));
     }
 }
