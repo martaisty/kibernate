@@ -2,13 +2,11 @@ package com.synytsia.orm.utils;
 
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Converter;
-import com.synytsia.orm.annotation.Column;
-import com.synytsia.orm.annotation.Entity;
-import com.synytsia.orm.annotation.Id;
-import com.synytsia.orm.annotation.Table;
+import com.synytsia.orm.annotation.*;
 
 import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -101,5 +99,23 @@ public class EntityUtil {
                 .map(EntityUtil::resolveColumnName)
                 .map(columnName -> columnName + " = ?")
                 .collect(Collectors.joining(","));
+    }
+
+    public static boolean isEntity(Field field) {
+        return field.isAnnotationPresent(ManyToOne.class);
+    }
+
+    public static boolean isCollection(Field field) {
+        return Collection.class.isAssignableFrom(field.getType());
+    }
+
+    public static boolean isRegularColumn(Field field) {
+        return !isEntity(field) && !isCollection(field);
+    }
+
+    public static String resolveJoinColumnName(Field field) {
+        return ofNullable(field.getDeclaredAnnotation(JoinColumn.class))
+                .map(JoinColumn::name)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown column name for relation '%s' in %s".formatted(field.getName(), field.getDeclaringClass().getName())));
     }
 }

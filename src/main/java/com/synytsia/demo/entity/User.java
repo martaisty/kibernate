@@ -1,10 +1,9 @@
 package com.synytsia.demo.entity;
 
-import com.synytsia.orm.annotation.Column;
-import com.synytsia.orm.annotation.Entity;
-import com.synytsia.orm.annotation.Id;
-import com.synytsia.orm.annotation.Table;
+import com.synytsia.orm.annotation.*;
 import lombok.Data;
+
+import java.util.List;
 
 @Data
 @Entity
@@ -18,4 +17,7 @@ public class User {
     private String name;
 
     private Integer age;
+
+    @OneToMany(mappedBy = "user")
+    private List<Skill> skills;
 }

@@ -47,13 +47,13 @@ public class SessionImpl implements Session {
              final var statement = c.prepareStatement(selectSql)) {
 
             statement.setObject(1, id);
-            final var rs = statement.executeQuery();
-
-            if (rs.next()) {
-                final var entity = createEntityFromResultSet(entityType, rs);
-                entities.put(entityKey, entity);
-                entitiesInitialSnapshot.put(entityKey, toSnapshot(entity));
-                return entity;
+            try (final var rs = statement.executeQuery()) {
+                if (rs.next()) {
+                    final var entity = createEntityFromResultSet(entityType, rs);
+                    entities.put(entityKey, entity);
+                    entitiesInitialSnapshot.put(entityKey, toSnapshot(entity));
+                    return entity;
+                }
             }
 
             throw new RuntimeException("Entity not found (id=%s)".formatted(id));
@@ -81,8 +81,21 @@ public class SessionImpl implements Session {
             final var entity = entityType.getConstructor().newInstance();
 
             for (Field field : entityType.getDeclaredFields()) {
-                final var columnName = EntityUtil.resolveColumnName(field);
-                final var fieldValue = rs.getObject(columnName);
+                final Object fieldValue;
+                if (isRegularColumn(field)) {
+                    final var columnName = EntityUtil.resolveColumnName(field);
+                    fieldValue = rs.getObject(columnName);
+                } else if (isEntity(field)) {
+                    final var joinColumnName = EntityUtil.resolveJoinColumnName(field);
+                    final var relatedEntityId = rs.getObject(joinColumnName);
+//                     FIXME correct implementation of hash code for entity
+                    fieldValue = findById(field.getType(), relatedEntityId);
+                } else if (isCollection(field)) {
+                    fieldValue = null;
+                    // TODO implement
+                } else {
+                    throw new IllegalArgumentException("Unsupported type(%s) in %s".formatted(field.getType().getName(), entityType.getName()));
+                }
 
                 field.setAccessible(true);
                 field.set(entity, fieldValue);
