@@ -118,4 +118,10 @@ public class EntityUtil {
                 .map(JoinColumn::name)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown column name for relation '%s' in %s".formatted(field.getName(), field.getDeclaringClass().getName())));
     }
+
+    public static String resolveOneToManyMappedBy(Field field) {
+        return ofNullable(field.getDeclaredAnnotation(OneToMany.class))
+                .map(OneToMany::mappedBy)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown mapping for relation '%s' in %s".formatted(field.getName(), field.getDeclaringClass().getName())));
+    }
 }

@@ -1,7 +1,6 @@
 package com.synytsia;
 
 import com.synytsia.demo.entity.Skill;
-import com.synytsia.demo.entity.User;
 import com.synytsia.orm.session.SessionFactoryImpl;
 import org.postgresql.ds.PGSimpleDataSource;
 
@@ -13,10 +12,12 @@ public class Main {
         final var sessionFactory = new SessionFactoryImpl(createDataSource());
         try (final var session = sessionFactory.openSession()) {
             final var skill = session.findById(Skill.class, 1L);
-            System.out.println(skill);
+            System.out.println(skill.getName());
+            final var user = skill.getUser();
+            System.out.println(user.getName());
+            System.out.println(user.getSkills());
 
-            final var user = session.findById(User.class, 1L);
-            System.out.println(user);
+            user.getSkills().get(0).setName("Jogging");
 
         } catch (IOException e) {
             throw new RuntimeException(e);

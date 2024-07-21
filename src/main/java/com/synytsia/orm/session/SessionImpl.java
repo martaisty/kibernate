@@ -1,14 +1,18 @@
 package com.synytsia.orm.session;
 
+import com.synytsia.orm.collection.LazyList;
 import com.synytsia.orm.utils.EntityUtil;
 
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.ParameterizedType;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.synytsia.orm.utils.EntityUtil.*;
@@ -36,7 +40,7 @@ public class SessionImpl implements Session {
 
 
         if (entities.containsKey(entityKey)) {
-            System.out.println("Returning entity from cache");
+            System.out.printf("Returning entity from cache %s%n", entityKey);
             return entityType.cast(entities.get(entityKey));
         }
 
@@ -48,9 +52,10 @@ public class SessionImpl implements Session {
              final var statement = c.prepareStatement(selectSql)) {
 
             statement.setObject(1, id);
+            System.out.println("SQL: " + selectSql);
             try (final var rs = statement.executeQuery()) {
                 if (rs.next()) {
-                    final var entity = createEntityFromResultSet(entityType, rs);
+                    final var entity = this.<T>createEntityFromResultSet(entityKey, rs);
                     entities.put(entityKey, entity);
                     entitiesInitialSnapshot.put(entityKey, toSnapshot(entity));
                     return entity;
@@ -77,22 +82,30 @@ public class SessionImpl implements Session {
         }
     }
 
-    private <T> T createEntityFromResultSet(Class<T> entityType, ResultSet rs) {
+    private <T> T createEntityFromResultSet(EntityKey entityKey, ResultSet rs) {
         try {
+            final var entityType = (Class<T>) entityKey.type();
             final var entity = entityType.getConstructor().newInstance();
 
             for (Field field : entityType.getDeclaredFields()) {
                 final Object fieldValue;
+
                 if (isRegularColumn(field)) {
                     final var columnName = EntityUtil.resolveColumnName(field);
+
                     fieldValue = rs.getObject(columnName);
                 } else if (isEntity(field)) {
                     final var joinColumnName = EntityUtil.resolveJoinColumnName(field);
                     final var relatedEntityId = rs.getObject(joinColumnName);
+
                     fieldValue = findById(field.getType(), relatedEntityId);
                 } else if (isCollection(field)) {
-                    fieldValue = null;
-                    // TODO implement
+                    final var collectionType = (ParameterizedType) field.getGenericType();
+                    final var relatedEntityType = (Class<?>) collectionType.getActualTypeArguments()[0];
+                    final var relatedEntityField = relatedEntityType.getDeclaredField(resolveOneToManyMappedBy(field));
+                    final var relatedEntityColumnName = resolveJoinColumnName(relatedEntityField);
+// TODO implement other collections and ManyToMany
+                    fieldValue = new LazyList<>(() -> loadAllByColumn(relatedEntityType, relatedEntityColumnName, entityKey.id()));
                 } else {
                     throw new IllegalArgumentException("Unsupported type(%s) in %s".formatted(field.getType().getName(), entityType.getName()));
                 }
@@ -103,7 +116,38 @@ public class SessionImpl implements Session {
 
             return entity;
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException |
-                 SQLException e) {
+                 SQLException | NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private List<?> loadAllByColumn(Class<?> entityType, String columnName, Object columnValue) {
+        throwIfClosed();
+        verifyEntity(entityType);
+
+        final var tableName = resolveTableName(entityType);
+        final var idColumnName = resolveIdColumnName(entityType);
+        final var selectSql = SELECT_BY_COLUMN_SQL.formatted(tableName, columnName);
+
+        System.out.println("SQL: " + selectSql);
+
+        try (final var c = dataSource.getConnection();
+             final var statement = c.prepareStatement(selectSql)) {
+            statement.setObject(1, columnValue);
+            final var list = new ArrayList<>();
+
+            try (final var rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    final var entityKey = new EntityKey(entityType, rs.getObject(idColumnName));
+                    final var entity = createEntityFromResultSet(entityKey, rs);
+                    entities.put(entityKey, entity);
+                    entitiesInitialSnapshot.put(entityKey, toSnapshot(entity));
+                    list.add(entity);
+                }
+            }
+
+            return list;
+        } catch (SQLException e) {
             throw new RuntimeException(e);
         }
     }
@@ -126,6 +170,7 @@ public class SessionImpl implements Session {
         final var idColumnName = resolveIdColumnName(entityKey.type());
         final var updateParams = resolveUpdateParams(entityKey.type());
         final var updateSql = UPDATE_BY_COLUMN_SQL.formatted(tableName, updateParams, idColumnName);
+        System.out.println("SQL: " + updateSql);
 
         try (final var connection = dataSource.getConnection();
              final var updateStatement = connection.prepareStatement(updateSql)) {
