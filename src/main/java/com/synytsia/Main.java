@@ -12,10 +12,10 @@ public class Main {
     public static void main(String[] args) {
         final var sessionFactory = new SessionFactoryImpl(createDataSource());
         try (final var session = sessionFactory.openSession()) {
-            final var skill = session.findById(Skill.class, 1);
-            final var user = session.findById(User.class, 1);
-
+            final var skill = session.findById(Skill.class, 1L);
             System.out.println(skill);
+
+            final var user = session.findById(User.class, 1L);
             System.out.println(user);
 
         } catch (IOException e) {

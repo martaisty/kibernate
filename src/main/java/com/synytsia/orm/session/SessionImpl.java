@@ -34,6 +34,7 @@ public class SessionImpl implements Session {
         EntityUtil.verifyEntity(entityType);
         final var entityKey = new EntityKey(entityType, id);
 
+
         if (entities.containsKey(entityKey)) {
             System.out.println("Returning entity from cache");
             return entityType.cast(entities.get(entityKey));
@@ -88,7 +89,6 @@ public class SessionImpl implements Session {
                 } else if (isEntity(field)) {
                     final var joinColumnName = EntityUtil.resolveJoinColumnName(field);
                     final var relatedEntityId = rs.getObject(joinColumnName);
-//                     FIXME correct implementation of hash code for entity
                     fieldValue = findById(field.getType(), relatedEntityId);
                 } else if (isCollection(field)) {
                     fieldValue = null;

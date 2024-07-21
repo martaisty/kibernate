@@ -2,6 +2,8 @@ package com.synytsia.demo.entity;
 
 import com.synytsia.orm.annotation.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 @Data
 @Entity
@@ -15,5 +17,7 @@ public class Skill {
 
     @ManyToOne
     @JoinColumn(name = "user_id")
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
     private User user;
 }
