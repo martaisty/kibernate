@@ -70,6 +70,12 @@ public class EntityUtil {
         if (field.isAnnotationPresent(Id.class)) {
             return false;
         }
+        if (isCollection(field)) {
+            return false;
+        }
+        if (isEntity(field)) {
+            return false;
+        }
         // TODO relations between other entities
         return ofNullable(field.getAnnotation(Column.class))
                 .map(Column::updatable)
